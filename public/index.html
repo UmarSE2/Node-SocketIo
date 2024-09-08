@@ -1,70 +1,3 @@
-<!-- <!DOCTYPE html>
-<html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat App</title>
-</head>
-
-<body>
-    <h1>Chatting</h1>
-
-    <input type="text" placeholder="Enter your username" id="username" />
-    <button id="joinBtn">Join Chat</button>
-    <input type="text" placeholder="Enter message" id="message" />
-    <button id="sendBtn">Send</button>
-    <div id="messages"></div>
-
-    <h2>Users</h2>
-    <ul id="userStatus"></ul>
-
-    <script src="/socket.io/socket.io.js"></script>
-
-    <script>
-        const socket = io();
-        const joinBtn = document.getElementById('joinBtn');
-        const sendBtn = document.getElementById('sendBtn');
-        const usernameInput = document.getElementById('username');
-        const messageInput = document.getElementById('message');
-        const allMessages = document.getElementById('messages');
-        const userStatus = document.getElementById('userStatus');
-
-        joinBtn.addEventListener('click', () => {
-            const username = usernameInput.value;
-            socket.emit('register', username);
-            usernameInput.disabled = true;
-            joinBtn.disabled = true;
-        });
-
-        socket.on('message', message => {
-            const p = document.createElement('p');
-            p.innerText = message;
-            allMessages.appendChild(p);
-        });
-
-        socket.on('user-status', ({ username, status }) => {
-            const userItem = document.getElementById(`user-${username}`);
-            if (userItem) {
-                userItem.innerText = `${username} is ${status}`;
-            } else {
-                const li = document.createElement('li');
-                li.id = `user-${username}`;
-                li.innerText = `${username} is ${status}`;
-                userStatus.appendChild(li);
-            }
-        });
-
-        sendBtn.addEventListener('click', () => {
-            const message = messageInput.value;
-            socket.emit('user-message', message);
-            messageInput.value = '';
-        });
-    </script>
-</body>
-
-</html> -->
-
 <!DOCTYPE html>
 <html lang="en">
 
@@ -130,6 +63,7 @@
         const userStatus = document.getElementById('userStatus');
 
         let username;
+        let replyToMessage = null;
 
         joinBtn.addEventListener('click', () => {
             username = usernameInput.value;
@@ -140,17 +74,40 @@
             }
         });
 
-        socket.on('message', ({ message, username: sender, timestamp }) => {
-            const p = document.createElement('p');
+        socket.on('message', ({ id, message, username: sender, timestamp, replyTo }) => {
+            const p = document.createElement('div');
             p.classList.add('message');
-            if (sender === username) {
-                p.classList.add('from-user1');
-                p.innerHTML = `<span class="timestamp">${timestamp}</span>You: ${message}`;
-            } else {
-                p.classList.add('from-other');
-                p.innerHTML = `<span class="timestamp">${timestamp}</span>${sender}: ${message}`;
+
+            let messageContent = '';
+
+            if (replyTo) {
+                messageContent += `<div class="reply-to"><strong>${replyTo.username}:</strong> ${replyTo.message}</div>`;
             }
+
+            if (sender === username) {
+                p.classList.add('from-other');
+                messageContent += `<span class="timestamp">${timestamp}</span>You: ${message}`;
+            } else {
+                p.classList.add('from-user1');
+                messageContent += `<span class="timestamp">${timestamp}</span>${sender}: ${message}`;
+            }
+
+            p.innerHTML = messageContent + ` <button onclick="replyTo('${id}', '${sender}', '${message}')">Reply</button>`;
             allMessages.appendChild(p);
+        });
+
+        function replyTo(id, sender, message) {
+            replyToMessage = { id, username: sender, message };
+            messageInput.focus();
+        }
+
+        sendBtn.addEventListener('click', () => {
+            const message = messageInput.value;
+            if (message) {
+                socket.emit('user-message', { message, replyTo: replyToMessage });
+                messageInput.value = '';
+                replyToMessage = null;
+            }
         });
 
         socket.on('user-status', ({ username, status }) => {
@@ -165,13 +122,6 @@
             }
         });
 
-        sendBtn.addEventListener('click', () => {
-            const message = messageInput.value;
-            if (message) {
-                socket.emit('user-message', message);
-                messageInput.value = '';
-            }
-        });
     </script>
 </body>
 
